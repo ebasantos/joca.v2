@@ -43,9 +43,10 @@ builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.AllowAnyOrigin()
+        policy.WithOrigins("http://localhost:3000")
               .AllowAnyMethod()
-              .AllowAnyHeader();
+              .AllowAnyHeader()
+              .AllowCredentials();
     });
 });
 
@@ -106,8 +107,17 @@ app.UseAuthorization();
 // Adiciona rota raiz
 app.MapGet("/", () => Results.Redirect("/api/contacts"));
 
-app.UseFastEndpoints(c => {
-    c.Endpoints.Configurator = ep => {
+// Add test endpoint
+app.MapGet("/api/ping", () =>
+{
+    app.Logger.LogInformation("Ping endpoint was called");
+    return Results.Ok(new { message = "pong", timestamp = DateTime.UtcNow });
+});
+
+app.UseFastEndpoints(c =>
+{
+    c.Endpoints.Configurator = ep =>
+    {
         ep.AllowAnonymous();
     };
 });
