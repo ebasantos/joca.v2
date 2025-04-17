@@ -42,9 +42,14 @@ const FileUpload = () => {
 
           // Map the Excel columns to the expected format
           const contacts = jsonData.map(row => {
+            // Extract phone number and ensure it's converted to a string
+            const phoneRaw = row.Telefone || row.telefone || row.PHONE || row.Phone || row.PhoneNumber || '';
+            // Ensure phoneNumber is always a string, even if it's a number in the Excel file
+            const phoneNumber = String(phoneRaw);
+
             return {
               name: row.Nome || row.nome || row.NAME || row.Name || '',
-              phoneNumber: row.Telefone || row.telefone || row.PHONE || row.Phone || row.PhoneNumber || '',
+              phoneNumber: phoneNumber,
               email: row.Email || row.email || row.EMAIL || '',
               company: row.Empresa || row.empresa || row.COMPANY || row.Company || '',
               notes: row.Notas || row.notas || row.NOTES || row.Notes || ''
@@ -90,6 +95,11 @@ const FileUpload = () => {
 
       // Send the parsed data to the backend
       console.log('Sending contacts:', contacts);
+      // Add additional logging for phoneNumber types
+      contacts.forEach((contact, index) => {
+        console.log(`Contact ${index} phone type:`, typeof contact.phoneNumber, 'Value:', contact.phoneNumber);
+      });
+
       const response = await fetch('http://localhost:5000/api/leads/upload', {
         method: 'POST',
         body: JSON.stringify({ Contacts: contacts }),

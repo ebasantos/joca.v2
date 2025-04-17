@@ -9,11 +9,11 @@ using WhatsappChatbot.Api.Data;
 
 #nullable disable
 
-namespace WhatsappChatbot.Api.Data.Migrations
+namespace WhatsappChatbot.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20250405235756_AddUsersTable")]
-    partial class AddUsersTable
+    [Migration("20250417014347_initial")]
+    partial class initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -33,13 +33,23 @@ namespace WhatsappChatbot.Api.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Company")
+                        .HasColumnType("text");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("Name")
+                    b.Property<string>("Email")
                         .HasColumnType("text");
 
-                    b.Property<string>("Phone")
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
+                    b.Property<string>("PhoneNumber")
                         .IsRequired()
                         .HasColumnType("text");
 
@@ -47,12 +57,12 @@ namespace WhatsappChatbot.Api.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<DateTime>("UpdatedAt")
+                    b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Phone")
+                    b.HasIndex("PhoneNumber")
                         .IsUnique();
 
                     b.ToTable("Contacts");
@@ -76,9 +86,16 @@ namespace WhatsappChatbot.Api.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("Type")
+                    b.Property<string>("Direction")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
@@ -110,6 +127,9 @@ namespace WhatsappChatbot.Api.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Email")
@@ -121,7 +141,7 @@ namespace WhatsappChatbot.Api.Data.Migrations
                         new
                         {
                             Id = 1,
-                            CreatedAt = new DateTime(2025, 4, 5, 23, 57, 56, 254, DateTimeKind.Utc).AddTicks(6610),
+                            CreatedAt = new DateTime(2025, 4, 17, 1, 43, 47, 316, DateTimeKind.Utc).AddTicks(5390),
                             Email = "admin@admin.com",
                             Name = "Administrador",
                             Password = "admin123"

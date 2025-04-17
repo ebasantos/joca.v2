@@ -2,6 +2,7 @@ using FastEndpoints;
 using Microsoft.EntityFrameworkCore;
 using WhatsappChatbot.Api.Data;
 using WhatsappChatbot.Api.Models;
+using WhatsappChatbot.Api.Services;
 
 namespace WhatsappChatbot.Api.Endpoints.Contacts;
 
@@ -23,11 +24,16 @@ public class UploadContactsDataEndpoint : Endpoint<ContactDataRequest>
 {
     private readonly AppDbContext _context;
     private readonly ILogger<UploadContactsDataEndpoint> _logger;
+    private readonly MessageSchedulerService _messageScheduler;
 
-    public UploadContactsDataEndpoint(AppDbContext context, ILogger<UploadContactsDataEndpoint> logger)
+    public UploadContactsDataEndpoint(
+        AppDbContext context,
+        ILogger<UploadContactsDataEndpoint> logger,
+        MessageSchedulerService messageScheduler)
     {
         _context = context;
         _logger = logger;
+        _messageScheduler = messageScheduler;
     }
 
     public override void Configure()
@@ -51,6 +57,7 @@ public class UploadContactsDataEndpoint : Endpoint<ContactDataRequest>
 
             int newCount = 0;
             int updatedCount = 0;
+            List<int> newContactIds = new List<int>();
 
             // Normalize all phone numbers in the request
             foreach (var contact in req.Contacts)
@@ -59,6 +66,11 @@ public class UploadContactsDataEndpoint : Endpoint<ContactDataRequest>
                 {
                     // Normalize by removing spaces, hyphens, and ensuring format
                     contact.PhoneNumber = NormalizePhoneNumber(contact.PhoneNumber);
+                    _logger.LogInformation("Normalized phone number: {PhoneNumber}", contact.PhoneNumber);
+                }
+                else
+                {
+                    _logger.LogWarning("Empty phone number for contact: {Name}", contact.Name);
                 }
             }
 
@@ -76,11 +88,17 @@ public class UploadContactsDataEndpoint : Endpoint<ContactDataRequest>
                     }
 
                     // Check if the contact already exists using direct query
+                    var normalizedPhoneNumber = contactData.PhoneNumber.Trim();
+                    _logger.LogInformation("Looking for existing contact with phone number: '{PhoneNumber}'", normalizedPhoneNumber);
+
                     var existingContact = await _context.Contacts
-                        .FirstOrDefaultAsync(c => c.PhoneNumber == contactData.PhoneNumber, ct);
+                        .FirstOrDefaultAsync(c => c.PhoneNumber == normalizedPhoneNumber, ct);
 
                     if (existingContact != null)
                     {
+                        _logger.LogInformation("Found existing contact: ID={Id}, Name={Name}, PhoneNumber={PhoneNumber}",
+                            existingContact.Id, existingContact.Name, existingContact.PhoneNumber);
+
                         // Update existing contact
                         existingContact.Name = contactData.Name;
                         existingContact.Email = contactData.Email;
@@ -92,6 +110,8 @@ public class UploadContactsDataEndpoint : Endpoint<ContactDataRequest>
                     }
                     else
                     {
+                        _logger.LogInformation("No existing contact found for phone number: '{PhoneNumber}', creating new contact", normalizedPhoneNumber);
+
                         // Create new contact
                         var newContact = new Contact
                         {
@@ -103,6 +123,9 @@ public class UploadContactsDataEndpoint : Endpoint<ContactDataRequest>
                         };
 
                         await _context.Contacts.AddAsync(newContact, ct);
+                        await _context.SaveChangesAsync(ct); // Save to get the ID
+
+                        newContactIds.Add(newContact.Id); // Store the new contact ID
                         newCount++;
                     }
 
@@ -111,6 +134,13 @@ public class UploadContactsDataEndpoint : Endpoint<ContactDataRequest>
                 }
 
                 await transaction.CommitAsync(ct);
+
+                // If we have new contacts, schedule welcome messages
+                if (newContactIds.Count > 0)
+                {
+                    _logger.LogInformation("Scheduling welcome messages for {count} new contacts", newContactIds.Count);
+                    _messageScheduler.ScheduleWelcomeMessages(newContactIds);
+                }
             }
             catch (Exception ex)
             {
@@ -123,7 +153,8 @@ public class UploadContactsDataEndpoint : Endpoint<ContactDataRequest>
             {
                 count = newCount + updatedCount,
                 newContacts = newCount,
-                updatedContacts = updatedCount
+                updatedContacts = updatedCount,
+                welcomeMessagesScheduled = newContactIds.Count
             }, ct);
         }
         catch (Exception ex)
@@ -139,8 +170,13 @@ public class UploadContactsDataEndpoint : Endpoint<ContactDataRequest>
         if (string.IsNullOrEmpty(phoneNumber))
             return phoneNumber;
 
+        _logger.LogDebug("Normalizing phone number. Original: {Original}, Type: {Type}",
+            phoneNumber, phoneNumber.GetType().FullName);
+
         // Remove any non-digit characters
         var digitsOnly = new string(phoneNumber.Where(char.IsDigit).ToArray());
+
+        _logger.LogDebug("Phone number after normalization: {Normalized}", digitsOnly);
 
         // Ensure consistent format - you may need to adjust this based on your requirements
         // This is a simple implementation - consider using a proper phone number library for production

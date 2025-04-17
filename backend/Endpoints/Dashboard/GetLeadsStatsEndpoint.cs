@@ -34,16 +34,21 @@ public class GetLeadsStatsEndpoint : EndpointWithoutRequest<LeadsStatsResponse>
     {
         try
         {
-            _logger.LogInformation("Fetching lead statistics");
+            _logger.LogInformation("Fetching lead statistics from database");
 
-            // Count total leads
+            // Get real counts from the database using the Status field
             var total = await _context.Contacts.CountAsync(ct);
+            var processed = await _context.Contacts.CountAsync(c => c.Status == "processed", ct);
+            var failed = await _context.Contacts.CountAsync(c => c.Status == "failed", ct);
+            var pending = await _context.Contacts.CountAsync(c => c.Status == "pending", ct);
 
-            // For demo purposes, we'll simulate different statuses
-            // In a real system, you would have a Status field on your Contact model
-            var processed = (int)(total * 0.7); // Assume 70% processed 
-            var failed = (int)(total * 0.1);    // Assume 10% failed
-            var pending = total - processed - failed; // The rest are pending
+            // Additional validation to ensure the counts add up
+            if (processed + failed + pending != total)
+            {
+                // This could happen if there are contacts with unexpected status values
+                _logger.LogWarning("Stats validation failed: processed ({processed}) + failed ({failed}) + pending ({pending}) != total ({total})",
+                    processed, failed, pending, total);
+            }
 
             var response = new LeadsStatsResponse
             {

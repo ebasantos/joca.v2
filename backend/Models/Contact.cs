@@ -20,8 +20,10 @@ public class Contact
 
     public string? Notes { get; set; }
 
+    public string Status { get; set; } = "pending"; // Options: pending, processed, failed
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
 
     public ICollection<Message> Messages { get; set; } = new List<Message>();
-} 
+}

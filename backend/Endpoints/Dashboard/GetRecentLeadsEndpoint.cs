@@ -18,7 +18,6 @@ public class GetRecentLeadsEndpoint : EndpointWithoutRequest<List<RecentLeadResp
 {
     private readonly AppDbContext _context;
     private readonly ILogger<GetRecentLeadsEndpoint> _logger;
-    private readonly Random _random = new Random();
 
     public GetRecentLeadsEndpoint(AppDbContext context, ILogger<GetRecentLeadsEndpoint> logger)
     {
@@ -36,22 +35,22 @@ public class GetRecentLeadsEndpoint : EndpointWithoutRequest<List<RecentLeadResp
     {
         try
         {
-            _logger.LogInformation("Fetching recent leads");
+            _logger.LogInformation("Fetching recent leads from database");
 
-            // Get the 10 most recent contacts
+            // Get the 10 most recent contacts with their actual status
             var recentContacts = await _context.Contacts
                 .OrderByDescending(c => c.CreatedAt)
                 .Take(10)
                 .ToListAsync(ct);
 
-            // Convert to response format (with simulated status)
+            // Convert to response format with actual status
             var response = recentContacts.Select(contact => new RecentLeadResponse
             {
                 Id = contact.Id,
                 Name = contact.Name,
                 Phone = contact.PhoneNumber,
-                // Simulate status for demo purposes
-                Status = GetRandomStatus(),
+                // Use the actual status from the database
+                Status = contact.Status,
                 ImportDate = contact.CreatedAt
             }).ToList();
 
@@ -62,12 +61,5 @@ public class GetRecentLeadsEndpoint : EndpointWithoutRequest<List<RecentLeadResp
             _logger.LogError(ex, "Error fetching recent leads");
             ThrowError("Error fetching recent leads");
         }
-    }
-
-    // Helper method to generate random status for demo
-    private string GetRandomStatus()
-    {
-        var statuses = new[] { "processed", "processed", "processed", "pending", "failed" };
-        return statuses[_random.Next(statuses.Length)]; // Weighted toward processed
     }
 }

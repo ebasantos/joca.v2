@@ -7,6 +7,8 @@ using System.Text;
 using WhatsappChatbot.Api.Data;
 using WhatsappChatbot.Api.Services;
 using Microsoft.OpenApi.Models;
+using Hangfire;
+using Hangfire.PostgreSql;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +20,17 @@ builder.Services.AddSwaggerGen();
 // Configure database
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// Configure Hangfire
+builder.Services.AddHangfire(config => config
+    .SetDataCompatibilityLevel(CompatibilityLevel.Version_170)
+    .UseSimpleAssemblyNameTypeSerializer()
+    .UseRecommendedSerializerSettings()
+    .UsePostgreSqlStorage(options =>
+    {
+        options.UseNpgsqlConnection(builder.Configuration.GetConnectionString("DefaultConnection"));
+    }));
+builder.Services.AddHangfireServer();
 
 // Configure JWT
 var jwtKey = builder.Configuration["Jwt:Key"];
@@ -87,6 +100,7 @@ builder.WebHost.ConfigureKestrel(options =>
 
 // Register services
 builder.Services.AddScoped<IChatbotService, ChatbotService>();
+builder.Services.AddScoped<MessageSchedulerService>();
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
@@ -101,6 +115,14 @@ if (app.Environment.IsDevelopment())
 app.UseStaticFiles();
 app.UseCors();
 app.UseHttpsRedirection();
+
+// Add Hangfire dashboard
+app.UseHangfireDashboard("/hangfire", new DashboardOptions
+{
+    // By default only local requests are allowed - disable this for development
+    Authorization = new[] { new AllowAllConnectionsFilter() }
+});
+
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -121,6 +143,14 @@ app.UseFastEndpoints(c =>
         ep.AllowAnonymous();
     };
 });
+
+// Schedule recurring jobs
+using (var scope = app.Services.CreateScope())
+{
+    // Schedule the inactive conversations check job
+    var messageScheduler = scope.ServiceProvider.GetRequiredService<MessageSchedulerService>();
+    messageScheduler.ScheduleInactiveConversationsCheck();
+}
 
 // Ensure database is created and migrations are applied
 using (var scope = app.Services.CreateScope())
